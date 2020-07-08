@@ -61,10 +61,12 @@ DOCKER_ENVS := \
 	-e DOCKER_LDFLAGS \
 	-e DOCKER_PORT \
 	-e DOCKER_REMAP_ROOT \
+	-e DOCKER_ROOTLESS \
 	-e DOCKER_STORAGE_OPTS \
 	-e DOCKER_TEST_HOST \
 	-e DOCKER_USERLANDPROXY \
 	-e DOCKERD_ARGS \
+	-e TEST_FORCE_VALIDATE \
 	-e TEST_INTEGRATION_DIR \
 	-e TEST_SKIP_INTEGRATION \
 	-e TEST_SKIP_INTEGRATION_CLI \
@@ -141,6 +143,10 @@ endif
 DOCKER_RUN_DOCKER := $(DOCKER_FLAGS) "$(DOCKER_IMAGE)"
 
 DOCKER_BUILD_ARGS += --build-arg=GO_VERSION
+ifdef DOCKER_SYSTEMD
+DOCKER_BUILD_ARGS += --build-arg=SYSTEMD=true
+endif
+
 BUILD_OPTS := ${BUILD_APT_MIRROR} ${DOCKER_BUILD_ARGS} ${DOCKER_BUILD_OPTS} -f "$(DOCKERFILE)"
 ifdef USE_BUILDX
 BUILD_OPTS += $(BUILDX_BUILD_EXTRA_OPTS)
@@ -162,26 +168,25 @@ VERSION_AUTOGEN_ARGS = --build-arg VERSION --build-arg DOCKER_GITCOMMIT --build-
 
 default: binary
 
-all: build ## validate all checks, build linux binaries, run all tests\ncross build non-linux binaries and generate archives
+all: build ## validate all checks, build linux binaries, run all tests,\ncross build non-linux binaries, and generate archives
 	$(DOCKER_RUN_DOCKER) bash -c 'hack/validate/default && hack/make.sh'
 
-binary: ## build statically linked linux binaries
-dynbinary: ## build dynamically linked linux binaries
-cross: ## cross build the binaries for darwin, freebsd and\nwindows
+# This is only used to work around read-only bind mounts of the source code into
+# binary build targets. We end up mounting a tmpfs over autogen which allows us
+# to write build-time generated assets even though the source is mounted read-only
+# ...But in order to do so, this dir needs to already exist.
+autogen:
+	mkdir -p autogen
 
-cross: BUILD_OPTS += --build-arg CROSS=true --build-arg DOCKER_CROSSPLATFORMS
-
-binary dynbinary cross: buildx
+binary: buildx autogen ## build statically linked linux binaries
 	$(BUILD_CMD) $(BUILD_OPTS) --output=bundles/ --target=$@ $(VERSION_AUTOGEN_ARGS) .
 
-build: target = --target=final
-ifdef USE_BUILDX
-build: bundles buildx
-	$(BUILD_CMD) $(BUILD_OPTS) $(BUILD_CROSS) $(target) -t "$(DOCKER_IMAGE)" .
-else
-build: bundles ## This is a legacy target and you should probably use something else.
-	$(BUILD_CMD) $(BUILD_OPTS) -t "$(DOCKER_IMAGE)" $(BUILD_CROSS) $(target) .
-endif
+dynbinary: buildx autogen ## build dynamically linked linux binaries
+	$(BUILD_CMD) $(BUILD_OPTS) --output=bundles/ --target=$@ $(VERSION_AUTOGEN_ARGS) .
+
+cross: BUILD_OPTS += --build-arg CROSS=true --build-arg DOCKER_CROSSPLATFORMS
+cross: buildx autogen ## cross build the binaries for darwin, freebsd and\nwindows
+	$(BUILD_CMD) $(BUILD_OPTS) --output=bundles/ --target=$@ $(VERSION_AUTOGEN_ARGS) .
 
 bundles:
 	mkdir bundles
@@ -202,19 +207,19 @@ install: ## install the linux binaries
 run: build ## run the docker daemon in a container
 	$(DOCKER_RUN_DOCKER) sh -c "KEEPBUNDLE=1 hack/make.sh install-binary run"
  
-.PHONY: build_shell
+.PHONY: build
 ifeq ($(BIND_DIR), .)
-build_shell: shell_target := --target=dev
+build: shell_target := --target=dev
 else
-build_shell: shell_target := --target=final
+build: shell_target := --target=final
 endif
 ifdef USE_BUILDX
-build_shell: buildx_load := --load
+build: buildx_load := --load
 endif
-build_shell: buildx
+build: buildx
 	$(BUILD_CMD) $(BUILD_OPTS) $(shell_target) $(buildx_load) $(BUILD_CROSS) -t "$(DOCKER_IMAGE)" .
 
-shell: build_shell  ## start a shell inside the build env
+shell: build  ## start a shell inside the build env
 	$(DOCKER_RUN_DOCKER) bash
 
 test: build test-unit ## run the unit, integration and docker-py tests

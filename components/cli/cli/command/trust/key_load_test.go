@@ -16,9 +16,9 @@ import (
 	"github.com/theupdateframework/notary/storage"
 	"github.com/theupdateframework/notary/trustmanager"
 	tufutils "github.com/theupdateframework/notary/tuf/utils"
-	"gotest.tools/assert"
-	is "gotest.tools/assert/cmp"
-	"gotest.tools/skip"
+	"gotest.tools/v3/assert"
+	is "gotest.tools/v3/assert/cmp"
+	"gotest.tools/v3/skip"
 )
 
 func TestTrustKeyLoadErrors(t *testing.T) {
@@ -65,7 +65,7 @@ func TestTrustKeyLoadErrors(t *testing.T) {
 		cli := test.NewFakeCli(&fakeClient{})
 		cmd := newKeyLoadCommand(cli)
 		cmd.SetArgs(tc.args)
-		cmd.SetOutput(ioutil.Discard)
+		cmd.SetOut(ioutil.Discard)
 		assert.ErrorContains(t, cmd.Execute(), tc.expectedError)
 		assert.Check(t, is.Contains(cli.OutBuffer().String(), tc.expectedOutput))
 	}

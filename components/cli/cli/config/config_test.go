@@ -14,8 +14,9 @@ import (
 	"github.com/docker/cli/cli/config/configfile"
 	"github.com/docker/cli/cli/config/credentials"
 	"github.com/pkg/errors"
-	"gotest.tools/assert"
-	is "gotest.tools/assert/cmp"
+	"gotest.tools/v3/assert"
+	is "gotest.tools/v3/assert/cmp"
+	"gotest.tools/v3/env"
 )
 
 var homeKey = "HOME"
@@ -88,7 +89,7 @@ func TestEmptyFile(t *testing.T) {
 	assert.NilError(t, err)
 
 	_, err = Load(tmpHome)
-	assert.Equal(t, errors.Cause(err), io.EOF)
+	assert.Assert(t, errors.Is(err, io.EOF))
 	assert.ErrorContains(t, err, ConfigFileName)
 }
 
@@ -120,12 +121,7 @@ email`: "Invalid auth configuration file",
 	tmpHome, err := ioutil.TempDir("", "config-test")
 	assert.NilError(t, err)
 	defer os.RemoveAll(tmpHome)
-
-	homeDir, err := os.UserHomeDir()
-	assert.NilError(t, err)
-
-	defer func() { os.Setenv(homeKey, homeDir) }()
-	os.Setenv(homeKey, tmpHome)
+	defer env.Patch(t, homeKey, tmpHome)()
 
 	for content, expectedError := range invalids {
 		fn := filepath.Join(tmpHome, oldConfigfile)
@@ -141,12 +137,7 @@ func TestOldValidAuth(t *testing.T) {
 	tmpHome, err := ioutil.TempDir("", "config-test")
 	assert.NilError(t, err)
 	defer os.RemoveAll(tmpHome)
-
-	homeDir, err := os.UserHomeDir()
-	assert.NilError(t, err)
-
-	defer func() { os.Setenv(homeKey, homeDir) }()
-	os.Setenv(homeKey, tmpHome)
+	defer env.Patch(t, homeKey, tmpHome)()
 
 	fn := filepath.Join(tmpHome, oldConfigfile)
 	js := `username = am9lam9lOmhlbGxv
@@ -180,12 +171,7 @@ func TestOldJSONInvalid(t *testing.T) {
 	tmpHome, err := ioutil.TempDir("", "config-test")
 	assert.NilError(t, err)
 	defer os.RemoveAll(tmpHome)
-
-	homeDir, err := os.UserHomeDir()
-	assert.NilError(t, err)
-
-	defer func() { os.Setenv(homeKey, homeDir) }()
-	os.Setenv(homeKey, tmpHome)
+	defer env.Patch(t, homeKey, tmpHome)()
 
 	fn := filepath.Join(tmpHome, oldConfigfile)
 	js := `{"https://index.docker.io/v1/":{"auth":"test","email":"user@example.com"}}`
@@ -204,12 +190,7 @@ func TestOldJSON(t *testing.T) {
 	tmpHome, err := ioutil.TempDir("", "config-test")
 	assert.NilError(t, err)
 	defer os.RemoveAll(tmpHome)
-
-	homeDir, err := os.UserHomeDir()
-	assert.NilError(t, err)
-
-	defer func() { os.Setenv(homeKey, homeDir) }()
-	os.Setenv(homeKey, tmpHome)
+	defer env.Patch(t, homeKey, tmpHome)()
 
 	fn := filepath.Join(tmpHome, oldConfigfile)
 	js := `{"https://index.docker.io/v1/":{"auth":"am9lam9lOmhlbGxv","email":"user@example.com"}}`
@@ -404,6 +385,7 @@ func TestJSONWithCredentialHelpers(t *testing.T) {
 
 // Save it and make sure it shows up in new form
 func saveConfigAndValidateNewFormat(t *testing.T, config *configfile.ConfigFile, configDir string) string {
+	t.Helper()
 	assert.NilError(t, config.Save())
 
 	buf, err := ioutil.ReadFile(filepath.Join(configDir, ConfigFileName))

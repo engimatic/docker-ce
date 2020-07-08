@@ -17,7 +17,7 @@ import (
 	"github.com/docker/docker/integration-cli/cli/build"
 	"github.com/docker/docker/pkg/parsers/kernel"
 	"github.com/docker/docker/testutil/request"
-	"gotest.tools/assert"
+	"gotest.tools/v3/assert"
 )
 
 func (s *DockerSuite) TestAPIImagesFilter(c *testing.T) {
@@ -44,7 +44,7 @@ func (s *DockerSuite) TestAPIImagesFilter(c *testing.T) {
 		return images
 	}
 
-	//incorrect number of matches returned
+	// incorrect number of matches returned
 	images := getImages("utest*/*")
 	assert.Equal(c, len(images[0].RepoTags), 2)
 

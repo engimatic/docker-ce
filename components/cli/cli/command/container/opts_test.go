@@ -14,9 +14,9 @@ import (
 	"github.com/docker/go-connections/nat"
 	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
-	"gotest.tools/assert"
-	is "gotest.tools/assert/cmp"
-	"gotest.tools/skip"
+	"gotest.tools/v3/assert"
+	is "gotest.tools/v3/assert/cmp"
+	"gotest.tools/v3/skip"
 )
 
 func TestValidateAttach(t *testing.T) {
@@ -64,12 +64,8 @@ func setupRunFlags() (*pflag.FlagSet, *containerOptions) {
 	return flags, copts
 }
 
-func parseMustError(t *testing.T, args string) {
-	_, _, _, err := parseRun(strings.Split(args+" ubuntu bash", " ")) //nolint:dogsled
-	assert.ErrorContains(t, err, "", args)
-}
-
 func mustParse(t *testing.T, args string) (*container.Config, *container.HostConfig) {
+	t.Helper()
 	config, hostConfig, _, err := parseRun(append(strings.Split(args, " "), "ubuntu", "bash"))
 	assert.NilError(t, err)
 	return config, hostConfig
@@ -88,32 +84,102 @@ func TestParseRunLinks(t *testing.T) {
 }
 
 func TestParseRunAttach(t *testing.T) {
-	if config, _ := mustParse(t, "-a stdin"); !config.AttachStdin || config.AttachStdout || config.AttachStderr {
-		t.Fatalf("Error parsing attach flags. Expect only Stdin enabled. Received: in: %v, out: %v, err: %v", config.AttachStdin, config.AttachStdout, config.AttachStderr)
+	tests := []struct {
+		input    string
+		expected container.Config
+	}{
+		{
+			input: "",
+			expected: container.Config{
+				AttachStdout: true,
+				AttachStderr: true,
+			},
+		},
+		{
+			input: "-i",
+			expected: container.Config{
+				AttachStdin:  true,
+				AttachStdout: true,
+				AttachStderr: true,
+			},
+		},
+		{
+			input: "-a stdin",
+			expected: container.Config{
+				AttachStdin: true,
+			},
+		},
+		{
+			input: "-a stdin -a stdout",
+			expected: container.Config{
+				AttachStdin:  true,
+				AttachStdout: true,
+			},
+		},
+		{
+			input: "-a stdin -a stdout -a stderr",
+			expected: container.Config{
+				AttachStdin:  true,
+				AttachStdout: true,
+				AttachStderr: true,
+			},
+		},
 	}
-	if config, _ := mustParse(t, "-a stdin -a stdout"); !config.AttachStdin || !config.AttachStdout || config.AttachStderr {
-		t.Fatalf("Error parsing attach flags. Expect only Stdin and Stdout enabled. Received: in: %v, out: %v, err: %v", config.AttachStdin, config.AttachStdout, config.AttachStderr)
-	}
-	if config, _ := mustParse(t, "-a stdin -a stdout -a stderr"); !config.AttachStdin || !config.AttachStdout || !config.AttachStderr {
-		t.Fatalf("Error parsing attach flags. Expect all attach enabled. Received: in: %v, out: %v, err: %v", config.AttachStdin, config.AttachStdout, config.AttachStderr)
-	}
-	if config, _ := mustParse(t, ""); config.AttachStdin || !config.AttachStdout || !config.AttachStderr {
-		t.Fatalf("Error parsing attach flags. Expect Stdin disabled. Received: in: %v, out: %v, err: %v", config.AttachStdin, config.AttachStdout, config.AttachStderr)
-	}
-	if config, _ := mustParse(t, "-i"); !config.AttachStdin || !config.AttachStdout || !config.AttachStderr {
-		t.Fatalf("Error parsing attach flags. Expect Stdin enabled. Received: in: %v, out: %v, err: %v", config.AttachStdin, config.AttachStdout, config.AttachStderr)
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.input, func(t *testing.T) {
+			config, _ := mustParse(t, tc.input)
+			assert.Equal(t, config.AttachStdin, tc.expected.AttachStdin)
+			assert.Equal(t, config.AttachStdout, tc.expected.AttachStdout)
+			assert.Equal(t, config.AttachStderr, tc.expected.AttachStderr)
+		})
 	}
 }
 
 func TestParseRunWithInvalidArgs(t *testing.T) {
-	parseMustError(t, "-a")
-	parseMustError(t, "-a invalid")
-	parseMustError(t, "-a invalid -a stdout")
-	parseMustError(t, "-a stdout -a stderr -d")
-	parseMustError(t, "-a stdin -d")
-	parseMustError(t, "-a stdout -d")
-	parseMustError(t, "-a stderr -d")
-	parseMustError(t, "-d --rm")
+	tests := []struct {
+		args  []string
+		error string
+	}{
+		{
+			args:  []string{"-a", "ubuntu", "bash"},
+			error: `invalid argument "ubuntu" for "-a, --attach" flag: valid streams are STDIN, STDOUT and STDERR`,
+		},
+		{
+			args:  []string{"-a", "invalid", "ubuntu", "bash"},
+			error: `invalid argument "invalid" for "-a, --attach" flag: valid streams are STDIN, STDOUT and STDERR`,
+		},
+		{
+			args:  []string{"-a", "invalid", "-a", "stdout", "ubuntu", "bash"},
+			error: `invalid argument "invalid" for "-a, --attach" flag: valid streams are STDIN, STDOUT and STDERR`,
+		},
+		{
+			args:  []string{"-a", "stdout", "-a", "stderr", "-z", "ubuntu", "bash"},
+			error: `unknown shorthand flag: 'z' in -z`,
+		},
+		{
+			args:  []string{"-a", "stdin", "-z", "ubuntu", "bash"},
+			error: `unknown shorthand flag: 'z' in -z`,
+		},
+		{
+			args:  []string{"-a", "stdout", "-z", "ubuntu", "bash"},
+			error: `unknown shorthand flag: 'z' in -z`,
+		},
+		{
+			args:  []string{"-a", "stderr", "-z", "ubuntu", "bash"},
+			error: `unknown shorthand flag: 'z' in -z`,
+		},
+		{
+			args:  []string{"-z", "--rm", "ubuntu", "bash"},
+			error: `unknown shorthand flag: 'z' in -z`,
+		},
+	}
+	flags, _ := setupRunFlags()
+	for _, tc := range tests {
+		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
+			assert.Error(t, flags.Parse(tc.args), tc.error)
+		})
+	}
 }
 
 // nolint: gocyclo
@@ -352,7 +418,7 @@ func TestParseWithExpose(t *testing.T) {
 }
 
 func TestParseDevice(t *testing.T) {
-	skip.If(t, runtime.GOOS == "windows") // Windows validates server-side
+	skip.If(t, runtime.GOOS != "linux") // Windows and macOS validate server-side
 	valids := map[string]container.DeviceMapping{
 		"/dev/snd": {
 			PathOnHost:        "/dev/snd",
@@ -768,7 +834,7 @@ func TestParseEntryPoint(t *testing.T) {
 }
 
 func TestValidateDevice(t *testing.T) {
-	skip.If(t, runtime.GOOS == "windows") // Windows validates server-side
+	skip.If(t, runtime.GOOS != "linux") // Windows and macOS validate server-side
 	valid := []string{
 		"/home",
 		"/home:/home",
@@ -870,5 +936,36 @@ func TestParseSystemPaths(t *testing.T) {
 		assert.DeepEqual(t, securityOpts, tc.out)
 		assert.DeepEqual(t, maskedPaths, tc.masked)
 		assert.DeepEqual(t, readonlyPaths, tc.readonly)
+	}
+}
+
+func TestConvertToStandardNotation(t *testing.T) {
+	valid := map[string][]string{
+		"20:10/tcp":               {"target=10,published=20"},
+		"40:30":                   {"40:30"},
+		"20:20 80:4444":           {"20:20", "80:4444"},
+		"1500:2500/tcp 1400:1300": {"target=2500,published=1500", "1400:1300"},
+		"1500:200/tcp 90:80/tcp":  {"published=1500,target=200", "target=80,published=90"},
+	}
+
+	invalid := [][]string{
+		{"published=1500,target:444"},
+		{"published=1500,444"},
+		{"published=1500,target,444"},
+	}
+
+	for key, ports := range valid {
+		convertedPorts, err := convertToStandardNotation(ports)
+
+		if err != nil {
+			assert.NilError(t, err)
+		}
+		assert.DeepEqual(t, strings.Split(key, " "), convertedPorts)
+	}
+
+	for _, ports := range invalid {
+		if _, err := convertToStandardNotation(ports); err == nil {
+			t.Fatalf("ConvertToStandardNotation(`%q`) should have failed conversion", ports)
+		}
 	}
 }

@@ -9,9 +9,9 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 
-	"gotest.tools/assert"
-	is "gotest.tools/assert/cmp"
-	"gotest.tools/golden"
+	"gotest.tools/v3/assert"
+	is "gotest.tools/v3/assert/cmp"
+	"gotest.tools/v3/golden"
 )
 
 func TestListErrors(t *testing.T) {
@@ -52,7 +52,7 @@ func TestListErrors(t *testing.T) {
 		for key, value := range tc.flags {
 			cmd.Flags().Set(key, value)
 		}
-		cmd.SetOutput(ioutil.Discard)
+		cmd.SetOut(ioutil.Discard)
 		assert.ErrorContains(t, cmd.Execute(), tc.expectedError)
 	}
 }

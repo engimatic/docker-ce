@@ -20,9 +20,9 @@ import (
 	"github.com/docker/docker/pkg/fsutils"
 	"github.com/docker/docker/pkg/idtools"
 	"github.com/docker/docker/pkg/locker"
-	"github.com/docker/docker/pkg/mount"
 	"github.com/docker/docker/pkg/parsers"
 	"github.com/docker/docker/pkg/system"
+	"github.com/moby/sys/mount"
 	"github.com/opencontainers/selinux/go-selinux/label"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
@@ -134,6 +134,14 @@ func Init(home string, options []string, uidMaps, gidMaps []idtools.IDMap) (grap
 	if err := overlayutils.SupportsOverlay(testdir, false); err != nil {
 		logrus.WithField("storage-driver", "overlay").Error(err)
 		return nil, graphdriver.ErrNotSupported
+	}
+
+	fsMagic, err := graphdriver.GetFSMagic(testdir)
+	if err != nil {
+		return nil, err
+	}
+	if fsName, ok := graphdriver.FsNames[fsMagic]; ok {
+		backingFs = fsName
 	}
 
 	supportsDType, err := fsutils.SupportsDType(testdir)

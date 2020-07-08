@@ -72,7 +72,7 @@ func (gs *gitSource) mountRemote(ctx context.Context, remote string) (target str
 	for _, si := range sis {
 		remoteRef, err = gs.cache.GetMutable(ctx, si.ID())
 		if err != nil {
-			if cache.IsLocked(err) {
+			if errors.Is(err, cache.ErrLocked) {
 				// should never really happen as no other function should access this metadata, but lets be graceful
 				logrus.Warnf("mutable ref for %s  %s was locked: %v", remote, si.ID(), err)
 				continue
@@ -272,8 +272,9 @@ func (gs *gitSourceHandler) Snapshot(ctx context.Context) (out cache.ImmutableRe
 		}
 		args = append(args, "origin")
 		if !isCommitSHA(ref) {
-			args = append(args, ref+":tags/"+ref)
-			// local refs are needed so they would be advertised on next fetches
+			args = append(args, "--force", ref+":tags/"+ref)
+			// local refs are needed so they would be advertised on next fetches. Force is used
+			// in case the ref is a branch and it now points to a different commit sha
 			// TODO: is there a better way to do this?
 		}
 		if _, err := gitWithinDir(ctx, gitDir, "", args...); err != nil {

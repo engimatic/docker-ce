@@ -25,10 +25,10 @@ import (
 )
 
 // SystemInfo returns information about the host server the daemon is running on.
-func (daemon *Daemon) SystemInfo() (*types.Info, error) {
+func (daemon *Daemon) SystemInfo() *types.Info {
 	defer metrics.StartTimer(hostInfoFunctions.WithValues("system_info"))()
 
-	sysInfo := sysinfo.New(true)
+	sysInfo := daemon.RawSysInfo(true)
 	cRunning, cPaused, cStopped := stateCtr.get()
 
 	v := &types.Info{
@@ -47,7 +47,6 @@ func (daemon *Daemon) SystemInfo() (*types.Info, error) {
 		NGoroutines:        runtime.NumGoroutine(),
 		SystemTime:         time.Now().Format(time.RFC3339Nano),
 		LoggingDriver:      daemon.defaultLogConfig.Type,
-		CgroupDriver:       daemon.getCgroupDriver(),
 		NEventsListener:    daemon.EventsService.SubscribersCount(),
 		KernelVersion:      kernelVersion(),
 		OperatingSystem:    operatingSystem(),
@@ -63,8 +62,6 @@ func (daemon *Daemon) SystemInfo() (*types.Info, error) {
 		Labels:             daemon.configStore.Labels,
 		ExperimentalBuild:  daemon.configStore.Experimental,
 		ServerVersion:      dockerversion.Version,
-		ClusterStore:       daemon.configStore.ClusterStore,
-		ClusterAdvertise:   daemon.configStore.ClusterAdvertise,
 		HTTPProxy:          maskCredentials(getEnvAny("HTTP_PROXY", "http_proxy")),
 		HTTPSProxy:         maskCredentials(getEnvAny("HTTPS_PROXY", "https_proxy")),
 		NoProxy:            getEnvAny("NO_PROXY", "no_proxy"),
@@ -72,6 +69,7 @@ func (daemon *Daemon) SystemInfo() (*types.Info, error) {
 		Isolation:          daemon.defaultIsolation,
 	}
 
+	daemon.fillClusterInfo(v)
 	daemon.fillAPIInfo(v)
 	// Retrieve platform specific info
 	daemon.fillPlatformInfo(v, sysInfo)
@@ -80,7 +78,7 @@ func (daemon *Daemon) SystemInfo() (*types.Info, error) {
 	daemon.fillSecurityOptions(v, sysInfo)
 	daemon.fillLicense(v)
 
-	return v, nil
+	return v
 }
 
 // SystemVersion returns version information about the daemon.
@@ -125,6 +123,16 @@ func (daemon *Daemon) SystemVersion() types.Version {
 
 	daemon.fillPlatformVersion(&v)
 	return v
+}
+
+func (daemon *Daemon) fillClusterInfo(v *types.Info) {
+	v.ClusterAdvertise = daemon.configStore.ClusterAdvertise
+	v.ClusterStore = daemon.configStore.ClusterStore
+
+	if v.ClusterAdvertise != "" || v.ClusterStore != "" {
+		v.Warnings = append(v.Warnings, `WARNING: node discovery and overlay networks with an external k/v store (cluster-advertise,
+         cluster-store, cluster-store-opt) are deprecated and will be removed in a future release.`)
+	}
 }
 
 func (daemon *Daemon) fillDriverInfo(v *types.Info) {

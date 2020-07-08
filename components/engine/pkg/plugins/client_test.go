@@ -14,8 +14,8 @@ import (
 	"github.com/docker/docker/pkg/plugins/transport"
 	"github.com/docker/go-connections/tlsconfig"
 	"github.com/pkg/errors"
-	"gotest.tools/assert"
-	is "gotest.tools/assert/cmp"
+	"gotest.tools/v3/assert"
+	is "gotest.tools/v3/assert/cmp"
 )
 
 var (
@@ -253,9 +253,9 @@ func TestClientWithRequestTimeout(t *testing.T) {
 	_, err := client.callWithRetry("/Plugin.Hello", nil, false, WithRequestTimeout(timeout))
 	assert.Assert(t, is.ErrorContains(err, ""), "expected error")
 
-	err = errors.Cause(err)
-	assert.ErrorType(t, err, (*timeoutError)(nil))
-	assert.Equal(t, err.(timeoutError).Timeout(), true)
+	var tErr timeoutError
+	assert.Assert(t, errors.As(err, &tErr))
+	assert.Assert(t, tErr.Timeout())
 }
 
 type testRequestWrapper struct {

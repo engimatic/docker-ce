@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"os"
 	"reflect"
 	"strings"
@@ -115,9 +116,10 @@ type CommonTLSOptions struct {
 
 // DNSConfig defines the DNS configurations.
 type DNSConfig struct {
-	DNS        []string `json:"dns,omitempty"`
-	DNSOptions []string `json:"dns-opts,omitempty"`
-	DNSSearch  []string `json:"dns-search,omitempty"`
+	DNS           []string `json:"dns,omitempty"`
+	DNSOptions    []string `json:"dns-opts,omitempty"`
+	DNSSearch     []string `json:"dns-search,omitempty"`
+	HostGatewayIP net.IP   `json:"host-gateway-ip,omitempty"`
 }
 
 // CommonConfig defines the configuration of a docker daemon which is
@@ -157,15 +159,18 @@ type CommonConfig struct {
 	// ClusterStore is the storage backend used for the cluster information. It is used by both
 	// multihost networking (to store networks and endpoints information) and by the node discovery
 	// mechanism.
+	// Deprecated: host-discovery and overlay networks with external k/v stores are deprecated
 	ClusterStore string `json:"cluster-store,omitempty"`
 
 	// ClusterOpts is used to pass options to the discovery package for tuning libkv settings, such
 	// as TLS configuration settings.
+	// Deprecated: host-discovery and overlay networks with external k/v stores are deprecated
 	ClusterOpts map[string]string `json:"cluster-store-opts,omitempty"`
 
 	// ClusterAdvertise is the network endpoint that the Engine advertises for the purpose of node
 	// discovery. This should be a 'host:port' combination on which that daemon instance is
 	// reachable by other hosts.
+	// Deprecated: host-discovery and overlay networks with external k/v stores are deprecated
 	ClusterAdvertise string `json:"cluster-advertise,omitempty"`
 
 	// MaxConcurrentDownloads is the maximum number of downloads that
@@ -304,25 +309,6 @@ func GetConflictFreeLabels(labels []string) ([]string, error) {
 		newLabels = append(newLabels, fmt.Sprintf("%s=%s", k, v))
 	}
 	return newLabels, nil
-}
-
-// ValidateReservedNamespaceLabels errors if the reserved namespaces com.docker.*,
-// io.docker.*, org.dockerproject.* are used in a configured engine label.
-//
-// TODO: This is a separate function because we need to warn users first of the
-// deprecation.  When we return an error, this logic can be added to Validate
-// or GetConflictFreeLabels instead of being here.
-func ValidateReservedNamespaceLabels(labels []string) error {
-	for _, label := range labels {
-		lowered := strings.ToLower(label)
-		if strings.HasPrefix(lowered, "com.docker.") || strings.HasPrefix(lowered, "io.docker.") ||
-			strings.HasPrefix(lowered, "org.dockerproject.") {
-			return fmt.Errorf(
-				"label %s not allowed: the namespaces com.docker.*, io.docker.*, and org.dockerproject.* are reserved for Docker's internal use",
-				label)
-		}
-	}
-	return nil
 }
 
 // Reload reads the configuration in the host and reloads the daemon and server.

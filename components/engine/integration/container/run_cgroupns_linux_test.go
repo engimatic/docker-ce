@@ -10,10 +10,10 @@ import (
 	"github.com/docker/docker/integration/internal/container"
 	"github.com/docker/docker/integration/internal/requirement"
 	"github.com/docker/docker/testutil/daemon"
-	"gotest.tools/assert"
-	is "gotest.tools/assert/cmp"
-	"gotest.tools/poll"
-	"gotest.tools/skip"
+	"gotest.tools/v3/assert"
+	is "gotest.tools/v3/assert/cmp"
+	"gotest.tools/v3/poll"
+	"gotest.tools/v3/skip"
 )
 
 // Gets the value of the cgroup namespace for pid 1 of a container
@@ -114,9 +114,8 @@ func TestCgroupNamespacesRunPrivilegedAndPrivate(t *testing.T) {
 	skip.If(t, testEnv.IsRemoteDaemon())
 	skip.If(t, !requirement.CgroupNamespacesEnabled())
 
-	// Running with both privileged and cgroupns=private is not allowed
-	errStr := "privileged mode is incompatible with private cgroup namespaces.  You must run the container in the host cgroup namespace when running privileged mode"
-	testCreateFailureWithCgroupNs(t, "private", errStr, container.WithPrivileged(true), container.WithCgroupnsMode("private"))
+	containerCgroup, daemonCgroup := testRunWithCgroupNs(t, "private", container.WithPrivileged(true), container.WithCgroupnsMode("private"))
+	assert.Assert(t, daemonCgroup != containerCgroup)
 }
 
 func TestCgroupNamespacesRunInvalidMode(t *testing.T) {

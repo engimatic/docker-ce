@@ -123,6 +123,17 @@ Secrets:
  Target:	{{$secret.File.Name}}
   Source:	{{$secret.SecretName}}
 {{- end }}{{ end }}
+{{- if .HasLogDriver }}
+Log Driver:
+{{- if .HasLogDriverName }}
+ Name:		{{ .LogDriverName }}
+{{- end }}
+{{- if .LogOpts }}
+ LogOpts:
+{{- range $k, $v := .LogOpts }}
+  {{ $k }}{{if $v }}:       {{ $v }}{{ end }}
+{{- end }}{{ end }}
+{{ end }}
 {{- if .HasResources }}
 Resources:
 {{- if .HasResourceReservations }}
@@ -141,6 +152,9 @@ Resources:
 {{- if .ResourceLimitMemory }}
   Memory:	{{ .ResourceLimitMemory }}
 {{- end }}{{ end }}{{ end }}
+{{- if gt .ResourceLimitPids 0 }}
+  PIDs:		{{ .ResourceLimitPids }}
+{{- end }}
 {{- if .Networks }}
 Networks:
 {{- range $network := .Networks }} {{ $network }}{{ end }} {{ end }}
@@ -236,6 +250,21 @@ func (ctx *serviceInspectContext) Name() string {
 
 func (ctx *serviceInspectContext) Labels() map[string]string {
 	return ctx.Service.Spec.Labels
+}
+
+func (ctx *serviceInspectContext) HasLogDriver() bool {
+	return ctx.Service.Spec.TaskTemplate.LogDriver != nil
+}
+
+func (ctx *serviceInspectContext) HasLogDriverName() bool {
+	return ctx.Service.Spec.TaskTemplate.LogDriver.Name != ""
+}
+func (ctx *serviceInspectContext) LogDriverName() string {
+	return ctx.Service.Spec.TaskTemplate.LogDriver.Name
+}
+
+func (ctx *serviceInspectContext) LogOpts() map[string]string {
+	return ctx.Service.Spec.TaskTemplate.LogDriver.Options
 }
 
 func (ctx *serviceInspectContext) Configs() []*swarm.ConfigReference {
@@ -458,7 +487,7 @@ func (ctx *serviceInspectContext) HasResourceLimits() bool {
 	if ctx.Service.Spec.TaskTemplate.Resources == nil || ctx.Service.Spec.TaskTemplate.Resources.Limits == nil {
 		return false
 	}
-	return ctx.Service.Spec.TaskTemplate.Resources.Limits.NanoCPUs > 0 || ctx.Service.Spec.TaskTemplate.Resources.Limits.MemoryBytes > 0
+	return ctx.Service.Spec.TaskTemplate.Resources.Limits.NanoCPUs > 0 || ctx.Service.Spec.TaskTemplate.Resources.Limits.MemoryBytes > 0 || ctx.Service.Spec.TaskTemplate.Resources.Limits.Pids > 0
 }
 
 func (ctx *serviceInspectContext) ResourceLimitsNanoCPUs() float64 {
@@ -470,6 +499,10 @@ func (ctx *serviceInspectContext) ResourceLimitMemory() string {
 		return ""
 	}
 	return units.BytesSize(float64(ctx.Service.Spec.TaskTemplate.Resources.Limits.MemoryBytes))
+}
+
+func (ctx *serviceInspectContext) ResourceLimitPids() int64 {
+	return ctx.Service.Spec.TaskTemplate.Resources.Limits.Pids
 }
 
 func (ctx *serviceInspectContext) Networks() []string {
@@ -570,6 +603,10 @@ func (c *serviceContext) Mode() string {
 		return "global"
 	case c.service.Spec.Mode.Replicated != nil:
 		return "replicated"
+	case c.service.Spec.Mode.ReplicatedJob != nil:
+		return "replicated job"
+	case c.service.Spec.Mode.GlobalJob != nil:
+		return "global job"
 	default:
 		return ""
 	}
@@ -578,10 +615,33 @@ func (c *serviceContext) Mode() string {
 func (c *serviceContext) Replicas() string {
 	s := &c.service
 
-	var running, desired uint64
+	var running, desired, completed uint64
 	if s.ServiceStatus != nil {
 		running = c.service.ServiceStatus.RunningTasks
 		desired = c.service.ServiceStatus.DesiredTasks
+		completed = c.service.ServiceStatus.CompletedTasks
+	}
+	// for jobs, we will not include the max per node, even if it is set. jobs
+	// include instead the progress of the job as a whole, in addition to the
+	// current running state. the system respects max per node, but if we
+	// included it in the list output, the lines for jobs would be entirely too
+	// long and make the UI look bad.
+	if s.Spec.Mode.ReplicatedJob != nil {
+		return fmt.Sprintf(
+			"%d/%d (%d/%d completed)",
+			running, desired, completed, *s.Spec.Mode.ReplicatedJob.TotalCompletions,
+		)
+	}
+	if s.Spec.Mode.GlobalJob != nil {
+		// for global jobs, we need to do a little math. desired tasks are only
+		// the tasks that have not yet actually reached the Completed state.
+		// Completed tasks have reached the completed state. the TOTAL number
+		// of tasks to run is the sum of the tasks desired to still complete,
+		// and the tasks actually completed.
+		return fmt.Sprintf(
+			"%d/%d (%d/%d completed)",
+			running, desired, completed, desired+completed,
+		)
 	}
 	if r := c.maxReplicas(); r > 0 {
 		return fmt.Sprintf("%d/%d (max %d per node)", running, desired, r)

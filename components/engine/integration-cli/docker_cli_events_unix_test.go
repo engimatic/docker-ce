@@ -17,8 +17,8 @@ import (
 	"github.com/creack/pty"
 	"github.com/docker/docker/integration-cli/cli/build"
 	"golang.org/x/sys/unix"
-	"gotest.tools/assert"
-	is "gotest.tools/assert/cmp"
+	"gotest.tools/v3/assert"
+	is "gotest.tools/v3/assert/cmp"
 )
 
 // #5979
@@ -51,7 +51,7 @@ func (s *DockerSuite) TestEventsRedirectStdout(c *testing.T) {
 func (s *DockerSuite) TestEventsOOMDisableFalse(c *testing.T) {
 	testRequires(c, DaemonIsLinux, oomControl, memoryLimitSupport, swapMemorySupport, NotPpc64le)
 
-	errChan := make(chan error)
+	errChan := make(chan error, 1)
 	go func() {
 		defer close(errChan)
 		out, exitCode, _ := dockerCmdWithError("run", "--name", "oomFalse", "-m", "10MB", "busybox", "sh", "-c", "x=a; while true; do x=$x$x$x$x; done")
@@ -81,7 +81,7 @@ func (s *DockerSuite) TestEventsOOMDisableFalse(c *testing.T) {
 func (s *DockerSuite) TestEventsOOMDisableTrue(c *testing.T) {
 	testRequires(c, DaemonIsLinux, oomControl, memoryLimitSupport, NotArm, swapMemorySupport, NotPpc64le)
 
-	errChan := make(chan error)
+	errChan := make(chan error, 1)
 	observer, err := newEventObserver(c)
 	assert.NilError(c, err)
 	err = observer.Start()
@@ -243,7 +243,7 @@ func (s *DockerSuite) TestEventsContainerWithMultiNetwork(c *testing.T) {
 	assert.Assert(c, strings.Contains(netEvents[0], "disconnect"))
 	assert.Assert(c, strings.Contains(netEvents[1], "disconnect"))
 
-	//both networks appeared in the network event output
+	// both networks appeared in the network event output
 	assert.Assert(c, strings.Contains(out, "test-event-network-local-1"))
 	assert.Assert(c, strings.Contains(out, "test-event-network-local-2"))
 }

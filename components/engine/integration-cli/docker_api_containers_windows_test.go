@@ -15,8 +15,8 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
-	"gotest.tools/assert"
-	is "gotest.tools/assert/cmp"
+	"gotest.tools/v3/assert"
+	is "gotest.tools/v3/assert/cmp"
 )
 
 func (s *DockerSuite) TestContainersAPICreateMountsBindNamedPipe(c *testing.T) {
@@ -65,7 +65,7 @@ func (s *DockerSuite) TestContainersAPICreateMountsBindNamedPipe(c *testing.T) {
 				},
 			},
 		},
-		nil, name)
+		nil, nil, name)
 	assert.NilError(c, err)
 
 	err = client.ContainerStart(ctx, name, types.ContainerStartOptions{})

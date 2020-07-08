@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/pkg/mount"
-	"gotest.tools/skip"
+	"github.com/moby/sys/mount"
+	"gotest.tools/v3/skip"
 )
 
 func TestEnsureRemoveAllNotExist(t *testing.T) {

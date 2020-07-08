@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/docker/cli/cli/config"
 	cliconfig "github.com/docker/cli/cli/config"
@@ -22,15 +24,13 @@ import (
 	"github.com/docker/cli/cli/streams"
 	"github.com/docker/cli/cli/trust"
 	"github.com/docker/cli/cli/version"
-	"github.com/docker/cli/internal/containerizedengine"
 	dopts "github.com/docker/cli/opts"
-	clitypes "github.com/docker/cli/types"
 	"github.com/docker/docker/api"
 	"github.com/docker/docker/api/types"
 	registrytypes "github.com/docker/docker/api/types/registry"
 	"github.com/docker/docker/client"
-	"github.com/docker/docker/pkg/term"
 	"github.com/docker/go-connections/tlsconfig"
+	"github.com/moby/term"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/theupdateframework/notary"
@@ -61,7 +61,6 @@ type Cli interface {
 	ManifestStore() manifeststore.Store
 	RegistryClient(bool) registryclient.RegistryClient
 	ContentTrustEnabled() bool
-	NewContainerizedEngineClient(sockPath string) (clitypes.ContainerizedClient, error)
 	ContextStore() store.Store
 	CurrentContext() string
 	StackOrchestrator(flagValue string) (Orchestrator, error)
@@ -71,19 +70,18 @@ type Cli interface {
 // DockerCli is an instance the docker command line client.
 // Instances of the client can be returned from NewDockerCli.
 type DockerCli struct {
-	configFile            *configfile.ConfigFile
-	in                    *streams.In
-	out                   *streams.Out
-	err                   io.Writer
-	client                client.APIClient
-	serverInfo            ServerInfo
-	clientInfo            *ClientInfo
-	contentTrust          bool
-	newContainerizeClient func(string) (clitypes.ContainerizedClient, error)
-	contextStore          store.Store
-	currentContext        string
-	dockerEndpoint        docker.Endpoint
-	contextStoreConfig    store.Config
+	configFile         *configfile.ConfigFile
+	in                 *streams.In
+	out                *streams.Out
+	err                io.Writer
+	client             client.APIClient
+	serverInfo         ServerInfo
+	clientInfo         *ClientInfo
+	contentTrust       bool
+	contextStore       store.Store
+	currentContext     string
+	dockerEndpoint     docker.Endpoint
+	contextStoreConfig store.Config
 }
 
 // DefaultVersion returns api.defaultVersion or DOCKER_API_VERSION if specified.
@@ -119,7 +117,7 @@ func (cli *DockerCli) In() *streams.In {
 // ShowHelp shows the command help.
 func ShowHelp(err io.Writer) func(*cobra.Command, []string) error {
 	return func(cmd *cobra.Command, args []string) error {
-		cmd.SetOutput(err)
+		cmd.SetOut(err)
 		cmd.HelpFunc()(cmd, args)
 		return nil
 	}
@@ -146,7 +144,9 @@ func (cli *DockerCli) ServerInfo() ServerInfo {
 // ClientInfo returns the client details for the cli
 func (cli *DockerCli) ClientInfo() ClientInfo {
 	if cli.clientInfo == nil {
-		_ = cli.loadClientInfo()
+		if err := cli.loadClientInfo(); err != nil {
+			panic(err)
+		}
 	}
 	return *cli.clientInfo
 }
@@ -274,11 +274,12 @@ func (cli *DockerCli) Initialize(opts *cliflags.ClientOptions, ops ...Initialize
 			return err
 		}
 	}
-	err = cli.loadClientInfo()
-	if err != nil {
+	cli.initializeFromClient()
+
+	if err := cli.loadClientInfo(); err != nil {
 		return err
 	}
-	cli.initializeFromClient()
+
 	return nil
 }
 
@@ -369,7 +370,16 @@ func isEnabled(value string) (bool, error) {
 }
 
 func (cli *DockerCli) initializeFromClient() {
-	ping, err := cli.client.Ping(context.Background())
+	ctx := context.Background()
+	if strings.HasPrefix(cli.DockerEndpoint().Host, "tcp://") {
+		// @FIXME context.WithTimeout doesn't work with connhelper / ssh connections
+		// time="2020-04-10T10:16:26Z" level=warning msg="commandConn.CloseWrite: commandconn: failed to wait: signal: killed"
+		var cancel func()
+		ctx, cancel = context.WithTimeout(ctx, 2*time.Second)
+		defer cancel()
+	}
+
+	ping, err := cli.client.Ping(ctx)
 	if err != nil {
 		// Default to true if we fail to connect to daemon
 		cli.serverInfo = ServerInfo{HasExperimental: true}
@@ -405,11 +415,6 @@ func getClientWithPassword(passRetriever notary.PassRetriever, newClient func(pa
 // NotaryClient provides a Notary Repository to interact with signed metadata for an image
 func (cli *DockerCli) NotaryClient(imgRefAndAuth trust.ImageRefAndAuth, actions []string) (notaryclient.Repository, error) {
 	return trust.GetNotaryRepository(cli.In(), cli.Out(), UserAgent(), imgRefAndAuth.RepoInfo(), imgRefAndAuth.AuthConfig(), actions...)
-}
-
-// NewContainerizedEngineClient returns a containerized engine client
-func (cli *DockerCli) NewContainerizedEngineClient(sockPath string) (clitypes.ContainerizedClient, error) {
-	return cli.newContainerizeClient(sockPath)
 }
 
 // ContextStore returns the ContextStore
@@ -471,13 +476,12 @@ type ClientInfo struct {
 }
 
 // NewDockerCli returns a DockerCli instance with all operators applied on it.
-// It applies by default the standard streams, the content trust from
-// environment and the default containerized client constructor operations.
+// It applies by default the standard streams, and the content trust from
+// environment.
 func NewDockerCli(ops ...DockerCliOption) (*DockerCli, error) {
 	cli := &DockerCli{}
 	defaultOps := []DockerCliOption{
 		WithContentTrustFromEnv(),
-		WithContainerizedClient(containerizedengine.NewClient),
 	}
 	cli.contextStoreConfig = DefaultContextStoreConfig()
 	ops = append(defaultOps, ops...)

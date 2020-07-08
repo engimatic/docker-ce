@@ -11,9 +11,9 @@ import (
 
 	"github.com/docker/docker/testutil/daemon"
 	req "github.com/docker/docker/testutil/request"
-	"gotest.tools/assert"
-	is "gotest.tools/assert/cmp"
-	"gotest.tools/skip"
+	"gotest.tools/v3/assert"
+	is "gotest.tools/v3/assert/cmp"
+	"gotest.tools/v3/skip"
 )
 
 func TestInfoBinaryCommits(t *testing.T) {
@@ -92,6 +92,7 @@ func TestInfoDiscoveryInvalidAdvertise(t *testing.T) {
 // configured with interface name properly show the advertise ip-address in info output.
 func TestInfoDiscoveryAdvertiseInterfaceName(t *testing.T) {
 	skip.If(t, testEnv.IsRemoteDaemon, "cannot run daemon when remote daemon")
+	skip.If(t, testEnv.IsRootless, "rootless mode has different view of network")
 	// TODO should we check for networking availability (integration-cli suite checks for networking through `Network()`)
 
 	d := daemon.New(t)

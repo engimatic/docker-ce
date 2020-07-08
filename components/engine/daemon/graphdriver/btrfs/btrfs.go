@@ -29,10 +29,10 @@ import (
 	"github.com/docker/docker/daemon/graphdriver"
 	"github.com/docker/docker/pkg/containerfs"
 	"github.com/docker/docker/pkg/idtools"
-	"github.com/docker/docker/pkg/mount"
 	"github.com/docker/docker/pkg/parsers"
 	"github.com/docker/docker/pkg/system"
 	units "github.com/docker/go-units"
+	"github.com/moby/sys/mount"
 	"github.com/opencontainers/selinux/go-selinux/label"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -134,7 +134,7 @@ func parseOptions(opt []string) (btrfsOptions, bool, error) {
 
 // Driver contains information about the filesystem mounted.
 type Driver struct {
-	//root of the file system
+	// root of the file system
 	home         string
 	uidMaps      []idtools.IDMap
 	gidMaps      []idtools.IDMap

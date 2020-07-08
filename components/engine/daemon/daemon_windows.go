@@ -222,8 +222,7 @@ func verifyDaemonSettings(config *config.Config) error {
 func checkSystem() error {
 	// Validate the OS version. Note that dockerd.exe must be manifested for this
 	// call to return the correct version.
-	osv := system.GetOSVersion()
-	if osv.MajorVersion < 10 {
+	if osversion.Get().MajorVersion < 10 {
 		return fmt.Errorf("This version of Windows does not support the docker daemon")
 	}
 	if osversion.Build() < osversion.RS1 {
@@ -557,7 +556,7 @@ func (daemon *Daemon) stats(c *container.Container) (*types.StatsJSON, error) {
 			CPUUsage: types.CPUUsage{
 				TotalUsage:        hcss.Processor.TotalRuntime100ns,
 				UsageInKernelmode: hcss.Processor.RuntimeKernel100ns,
-				UsageInUsermode:   hcss.Processor.RuntimeKernel100ns,
+				UsageInUsermode:   hcss.Processor.RuntimeUser100ns,
 			},
 		}
 
@@ -653,4 +652,13 @@ func (daemon *Daemon) initRuntimes(_ map[string]types.Runtime) error {
 }
 
 func setupResolvConf(config *config.Config) {
+}
+
+func (daemon *Daemon) useShimV2() bool {
+	return true
+}
+
+// RawSysInfo returns *sysinfo.SysInfo .
+func (daemon *Daemon) RawSysInfo(quiet bool) *sysinfo.SysInfo {
+	return sysinfo.New(quiet)
 }

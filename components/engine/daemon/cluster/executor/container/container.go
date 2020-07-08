@@ -281,7 +281,9 @@ func convertMount(m api.Mount) enginemount.Mount {
 	}
 
 	if m.BindOptions != nil {
-		mount.BindOptions = &enginemount.BindOptions{}
+		mount.BindOptions = &enginemount.BindOptions{
+			NonRecursive: m.BindOptions.NonRecursive,
+		}
 		switch m.BindOptions.Propagation {
 		case api.MountPropagationRPrivate:
 			mount.BindOptions.Propagation = enginemount.PropagationRPrivate
@@ -428,6 +430,12 @@ func (c *containerConfig) volumeCreateRequest(mount *api.Mount) *volumetypes.Vol
 
 func (c *containerConfig) resources() enginecontainer.Resources {
 	resources := enginecontainer.Resources{}
+
+	// set pids limit
+	pidsLimit := c.spec().PidsLimit
+	if pidsLimit > 0 {
+		resources.PidsLimit = &pidsLimit
+	}
 
 	// If no limits are specified let the engine use its defaults.
 	//

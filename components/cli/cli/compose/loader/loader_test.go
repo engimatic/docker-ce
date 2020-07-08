@@ -12,8 +12,8 @@ import (
 	"github.com/docker/cli/cli/compose/types"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/sirupsen/logrus"
-	"gotest.tools/assert"
-	is "gotest.tools/assert/cmp"
+	"gotest.tools/v3/assert"
+	is "gotest.tools/v3/assert/cmp"
 )
 
 func buildConfigDetails(source map[string]interface{}, env map[string]string) types.ConfigDetails {
@@ -1276,11 +1276,13 @@ services:
     extra_hosts:
       "zulu": "162.242.195.82"
       "alpha": "50.31.209.229"
+      "host.docker.internal": "host-gateway"
 `)
 	assert.NilError(t, err)
 
 	expected := types.HostsList{
 		"alpha:50.31.209.229",
+		"host.docker.internal:host-gateway",
 		"zulu:162.242.195.82",
 	}
 
@@ -1298,6 +1300,7 @@ services:
       - "zulu:162.242.195.82"
       - "alpha:50.31.209.229"
       - "zulu:ff02::1"
+      - "host.docker.internal:host-gateway"
 `)
 	assert.NilError(t, err)
 
@@ -1305,6 +1308,7 @@ services:
 		"zulu:162.242.195.82",
 		"alpha:50.31.209.229",
 		"zulu:ff02::1",
+		"host.docker.internal:host-gateway",
 	}
 
 	assert.Assert(t, is.Len(config.Services, 1))

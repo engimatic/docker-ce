@@ -10,6 +10,7 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	containertypes "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/versions"
 	"github.com/docker/docker/client"
@@ -17,10 +18,11 @@ import (
 	ctr "github.com/docker/docker/integration/internal/container"
 	"github.com/docker/docker/oci"
 	"github.com/docker/docker/testutil/request"
-	"gotest.tools/assert"
-	is "gotest.tools/assert/cmp"
-	"gotest.tools/poll"
-	"gotest.tools/skip"
+	specs "github.com/opencontainers/image-spec/specs-go/v1"
+	"gotest.tools/v3/assert"
+	is "gotest.tools/v3/assert/cmp"
+	"gotest.tools/v3/poll"
+	"gotest.tools/v3/skip"
 )
 
 func TestCreateFailsWhenIdentifierDoesNotExist(t *testing.T) {
@@ -57,6 +59,7 @@ func TestCreateFailsWhenIdentifierDoesNotExist(t *testing.T) {
 				&container.Config{Image: tc.image},
 				&container.HostConfig{},
 				&network.NetworkingConfig{},
+				nil,
 				"",
 			)
 			assert.Check(t, is.ErrorContains(err, tc.expectedError))
@@ -81,6 +84,7 @@ func TestCreateLinkToNonExistingContainer(t *testing.T) {
 			Links: []string{"no-such-container"},
 		},
 		&network.NetworkingConfig{},
+		nil,
 		"",
 	)
 	assert.Check(t, is.ErrorContains(err, "could not get container for no-such-container"))
@@ -120,6 +124,7 @@ func TestCreateWithInvalidEnv(t *testing.T) {
 				},
 				&container.HostConfig{},
 				&network.NetworkingConfig{},
+				nil,
 				"",
 			)
 			assert.Check(t, is.ErrorContains(err, tc.expectedError))
@@ -166,6 +171,7 @@ func TestCreateTmpfsMountsTarget(t *testing.T) {
 				Tmpfs: map[string]string{tc.target: ""},
 			},
 			&network.NetworkingConfig{},
+			nil,
 			"",
 		)
 		assert.Check(t, is.ErrorContains(err, tc.expectedError))
@@ -235,6 +241,7 @@ func TestCreateWithCustomMaskedPaths(t *testing.T) {
 			&config,
 			&hc,
 			&network.NetworkingConfig{},
+			nil,
 			name,
 		)
 		assert.NilError(t, err)
@@ -361,6 +368,7 @@ func TestCreateWithCapabilities(t *testing.T) {
 				&container.Config{Image: "busybox"},
 				&tc.hostConfig,
 				&network.NetworkingConfig{},
+				nil,
 				"",
 			)
 			if tc.expectedError == "" {
@@ -439,6 +447,7 @@ func TestCreateWithCustomReadonlyPaths(t *testing.T) {
 			&config,
 			&hc,
 			&network.NetworkingConfig{},
+			nil,
 			name,
 		)
 		assert.NilError(t, err)
@@ -522,7 +531,7 @@ func TestCreateWithInvalidHealthcheckParams(t *testing.T) {
 				cfg.Healthcheck.StartPeriod = tc.startPeriod
 			}
 
-			resp, err := client.ContainerCreate(ctx, &cfg, &container.HostConfig{}, nil, "")
+			resp, err := client.ContainerCreate(ctx, &cfg, &container.HostConfig{}, nil, nil, "")
 			assert.Check(t, is.Equal(len(resp.Warnings), 0))
 
 			if versions.LessThan(testEnv.DaemonAPIVersion(), "1.32") {
@@ -533,4 +542,97 @@ func TestCreateWithInvalidHealthcheckParams(t *testing.T) {
 			assert.ErrorContains(t, err, tc.expectedErr)
 		})
 	}
+}
+
+// Make sure that anonymous volumes can be overritten by tmpfs
+// https://github.com/moby/moby/issues/40446
+func TestCreateTmpfsOverrideAnonymousVolume(t *testing.T) {
+	skip.If(t, testEnv.DaemonInfo.OSType == "windows", "windows does not support tmpfs")
+	defer setupTest(t)()
+	client := testEnv.APIClient()
+	ctx := context.Background()
+
+	id := ctr.Create(ctx, t, client,
+		ctr.WithVolume("/foo"),
+		ctr.WithTmpfs("/foo"),
+		ctr.WithVolume("/bar"),
+		ctr.WithTmpfs("/bar:size=999"),
+		ctr.WithCmd("/bin/sh", "-c", "mount | grep '/foo' | grep tmpfs && mount | grep '/bar' | grep tmpfs"),
+	)
+
+	defer func() {
+		err := client.ContainerRemove(ctx, id, types.ContainerRemoveOptions{Force: true})
+		assert.NilError(t, err)
+	}()
+
+	inspect, err := client.ContainerInspect(ctx, id)
+	assert.NilError(t, err)
+	// tmpfs do not currently get added to inspect.Mounts
+	// Normally an anonymous volume would, except now tmpfs should prevent that.
+	assert.Assert(t, is.Len(inspect.Mounts, 0))
+
+	chWait, chErr := client.ContainerWait(ctx, id, container.WaitConditionNextExit)
+	assert.NilError(t, client.ContainerStart(ctx, id, types.ContainerStartOptions{}))
+
+	timeout := time.NewTimer(30 * time.Second)
+	defer timeout.Stop()
+
+	select {
+	case <-timeout.C:
+		t.Fatal("timeout waiting for container to exit")
+	case status := <-chWait:
+		var errMsg string
+		if status.Error != nil {
+			errMsg = status.Error.Message
+		}
+		assert.Equal(t, int(status.StatusCode), 0, errMsg)
+	case err := <-chErr:
+		assert.NilError(t, err)
+	}
+}
+
+// Test that if the referenced image platform does not match the requested platform on container create that we get an
+// error.
+func TestCreateDifferentPlatform(t *testing.T) {
+	defer setupTest(t)()
+	c := testEnv.APIClient()
+	ctx := context.Background()
+
+	img, _, err := c.ImageInspectWithRaw(ctx, "busybox:latest")
+	assert.NilError(t, err)
+	assert.Assert(t, img.Architecture != "")
+
+	t.Run("different os", func(t *testing.T) {
+		p := specs.Platform{
+			OS:           img.Os + "DifferentOS",
+			Architecture: img.Architecture,
+			Variant:      img.Variant,
+		}
+		_, err := c.ContainerCreate(ctx, &containertypes.Config{Image: "busybox:latest"}, &containertypes.HostConfig{}, nil, &p, "")
+		assert.Assert(t, client.IsErrNotFound(err), err)
+	})
+	t.Run("different cpu arch", func(t *testing.T) {
+		p := specs.Platform{
+			OS:           img.Os,
+			Architecture: img.Architecture + "DifferentArch",
+			Variant:      img.Variant,
+		}
+		_, err := c.ContainerCreate(ctx, &containertypes.Config{Image: "busybox:latest"}, &containertypes.HostConfig{}, nil, &p, "")
+		assert.Assert(t, client.IsErrNotFound(err), err)
+	})
+}
+
+func TestCreateVolumesFromNonExistingContainer(t *testing.T) {
+	defer setupTest(t)()
+	cli := testEnv.APIClient()
+
+	_, err := cli.ContainerCreate(
+		context.Background(),
+		&container.Config{Image: "busybox"},
+		&container.HostConfig{VolumesFrom: []string{"nosuchcontainer"}},
+		nil,
+		nil,
+		"",
+	)
+	assert.Check(t, errdefs.IsInvalidParameter(err))
 }

@@ -9,8 +9,8 @@ import (
 	"github.com/docker/cli/internal/test"
 	"github.com/docker/docker/api/types"
 	"github.com/pkg/errors"
-	"gotest.tools/assert"
-	is "gotest.tools/assert/cmp"
+	"gotest.tools/v3/assert"
+	is "gotest.tools/v3/assert/cmp"
 )
 
 func TestNewImportCommandErrors(t *testing.T) {
@@ -36,7 +36,7 @@ func TestNewImportCommandErrors(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		cmd := NewImportCommand(test.NewFakeCli(&fakeClient{imageImportFunc: tc.imageImportFunc}))
-		cmd.SetOutput(ioutil.Discard)
+		cmd.SetOut(ioutil.Discard)
 		cmd.SetArgs(tc.args)
 		assert.ErrorContains(t, cmd.Execute(), tc.expectedError)
 	}
@@ -44,7 +44,7 @@ func TestNewImportCommandErrors(t *testing.T) {
 
 func TestNewImportCommandInvalidFile(t *testing.T) {
 	cmd := NewImportCommand(test.NewFakeCli(&fakeClient{}))
-	cmd.SetOutput(ioutil.Discard)
+	cmd.SetOut(ioutil.Discard)
 	cmd.SetArgs([]string{"testdata/import-command-success.unexistent-file"})
 	assert.ErrorContains(t, cmd.Execute(), "testdata/import-command-success.unexistent-file")
 }
@@ -90,7 +90,7 @@ func TestNewImportCommandSuccess(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		cmd := NewImportCommand(test.NewFakeCli(&fakeClient{imageImportFunc: tc.imageImportFunc}))
-		cmd.SetOutput(ioutil.Discard)
+		cmd.SetOut(ioutil.Discard)
 		cmd.SetArgs(tc.args)
 		assert.NilError(t, cmd.Execute())
 	}

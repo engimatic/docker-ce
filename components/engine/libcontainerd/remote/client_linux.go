@@ -16,7 +16,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const runtimeName = "io.containerd.runtime.v1.linux"
+const (
+	runtimeName       = "io.containerd.runtime.v1.linux"
+	shimV2RuntimeName = "io.containerd.runc.v2"
+)
 
 func summaryFromInterface(i interface{}) (*libcontainerdtypes.Summary, error) {
 	return &libcontainerdtypes.Summary{}, nil
@@ -92,6 +95,10 @@ func WithBundle(bundleDir string, ociSpec *specs.Spec) containerd.NewContainerOp
 		c.Labels[DockerContainerBundlePath] = p
 		return nil
 	}
+}
+
+func withLogLevel(_ logrus.Level) containerd.NewTaskOpts {
+	panic("Not implemented")
 }
 
 func newFIFOSet(bundleDir, processID string, withStdin, withTerminal bool) *cio.FIFOSet {

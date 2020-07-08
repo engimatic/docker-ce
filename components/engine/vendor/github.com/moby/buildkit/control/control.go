@@ -274,10 +274,11 @@ func (c *Controller) Solve(ctx context.Context, req *controlapi.SolveRequest) (*
 	}
 
 	resp, err := c.solver.Solve(ctx, req.Ref, frontend.SolveRequest{
-		Frontend:     req.Frontend,
-		Definition:   req.Definition,
-		FrontendOpt:  req.FrontendAttrs,
-		CacheImports: cacheImports,
+		Frontend:       req.Frontend,
+		Definition:     req.Definition,
+		FrontendOpt:    req.FrontendAttrs,
+		FrontendInputs: req.FrontendInputs,
+		CacheImports:   cacheImports,
 	}, llbsolver.ExporterRequest{
 		Exporter:        expi,
 		CacheExporter:   cacheExporter,
@@ -372,7 +373,7 @@ func (c *Controller) ListWorkers(ctx context.Context, r *controlapi.ListWorkersR
 		resp.Record = append(resp.Record, &apitypes.WorkerRecord{
 			ID:        w.ID(),
 			Labels:    w.Labels(),
-			Platforms: pb.PlatformsFromSpec(w.Platforms()),
+			Platforms: pb.PlatformsFromSpec(w.Platforms(true)),
 			GCPolicy:  toPBGCPolicy(w.GCPolicy()),
 		})
 	}

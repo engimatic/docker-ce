@@ -14,8 +14,8 @@ import (
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/docker/docker/client"
 	"github.com/pkg/errors"
-	"gotest.tools/assert"
-	is "gotest.tools/assert/cmp"
+	"gotest.tools/v3/assert"
+	is "gotest.tools/v3/assert/cmp"
 )
 
 func TestConvertRestartPolicyFromNone(t *testing.T) {
@@ -74,7 +74,7 @@ func TestConvertExtraHosts(t *testing.T) {
 
 func TestConvertResourcesFull(t *testing.T) {
 	source := composetypes.Resources{
-		Limits: &composetypes.Resource{
+		Limits: &composetypes.ResourceLimit{
 			NanoCPUs:    "0.003",
 			MemoryBytes: composetypes.UnitBytes(300000000),
 		},
@@ -87,7 +87,7 @@ func TestConvertResourcesFull(t *testing.T) {
 	assert.NilError(t, err)
 
 	expected := &swarm.ResourceRequirements{
-		Limits: &swarm.Resources{
+		Limits: &swarm.Limit{
 			NanoCPUs:    3000000,
 			MemoryBytes: 300000000,
 		},
@@ -101,7 +101,7 @@ func TestConvertResourcesFull(t *testing.T) {
 
 func TestConvertResourcesOnlyMemory(t *testing.T) {
 	source := composetypes.Resources{
-		Limits: &composetypes.Resource{
+		Limits: &composetypes.ResourceLimit{
 			MemoryBytes: composetypes.UnitBytes(300000000),
 		},
 		Reservations: &composetypes.Resource{
@@ -112,7 +112,7 @@ func TestConvertResourcesOnlyMemory(t *testing.T) {
 	assert.NilError(t, err)
 
 	expected := &swarm.ResourceRequirements{
-		Limits: &swarm.Resources{
+		Limits: &swarm.Limit{
 			MemoryBytes: 300000000,
 		},
 		Reservations: &swarm.Resources{

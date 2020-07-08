@@ -27,8 +27,6 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/integration-cli/cli"
 	"github.com/docker/docker/integration-cli/cli/build"
-	"github.com/docker/docker/pkg/mount"
-	"github.com/docker/docker/pkg/parsers/kernel"
 	"github.com/docker/docker/pkg/stringid"
 	"github.com/docker/docker/runconfig"
 	"github.com/docker/docker/testutil"
@@ -36,8 +34,10 @@ import (
 	"github.com/docker/go-connections/nat"
 	"github.com/docker/libnetwork/resolvconf"
 	"github.com/docker/libnetwork/types"
-	"gotest.tools/assert"
-	"gotest.tools/icmd"
+	"github.com/moby/sys/mount"
+	"github.com/moby/sys/mountinfo"
+	"gotest.tools/v3/assert"
+	"gotest.tools/v3/icmd"
 )
 
 // "test123" should be printed by docker run
@@ -175,7 +175,7 @@ func (s *DockerSuite) TestRunWithoutNetworking(c *testing.T) {
 	}
 }
 
-//test --link use container name to link target
+// test --link use container name to link target
 func (s *DockerSuite) TestRunLinksContainerWithContainerName(c *testing.T) {
 	// TODO Windows: This test cannot run on a Windows daemon as the networking
 	// settings are not populated back yet on inspect.
@@ -190,7 +190,7 @@ func (s *DockerSuite) TestRunLinksContainerWithContainerName(c *testing.T) {
 	}
 }
 
-//test --link use container id to link target
+// test --link use container id to link target
 func (s *DockerSuite) TestRunLinksContainerWithContainerID(c *testing.T) {
 	// TODO Windows: This test cannot run on a Windows daemon as the networking
 	// settings are not populated back yet on inspect.
@@ -1430,7 +1430,7 @@ func (s *DockerSuite) TestRunResolvconfUpdate(c *testing.T) {
 	tmpResolvConf := []byte("search pommesfrites.fr\nnameserver 12.34.56.78\n")
 	tmpLocalhostResolvConf := []byte("nameserver 127.0.0.1")
 
-	//take a copy of resolv.conf for restoring after test completes
+	// take a copy of resolv.conf for restoring after test completes
 	resolvConfSystem, err := ioutil.ReadFile("/etc/resolv.conf")
 	if err != nil {
 		c.Fatal(err)
@@ -1439,7 +1439,7 @@ func (s *DockerSuite) TestRunResolvconfUpdate(c *testing.T) {
 	// This test case is meant to test monitoring resolv.conf when it is
 	// a regular file not a bind mounc. So we unmount resolv.conf and replace
 	// it with a file containing the original settings.
-	mounted, err := mount.Mounted("/etc/resolv.conf")
+	mounted, err := mountinfo.Mounted("/etc/resolv.conf")
 	if err != nil {
 		c.Fatal(err)
 	}
@@ -1447,14 +1447,14 @@ func (s *DockerSuite) TestRunResolvconfUpdate(c *testing.T) {
 		icmd.RunCommand("umount", "/etc/resolv.conf").Assert(c, icmd.Success)
 	}
 
-	//cleanup
+	// cleanup
 	defer func() {
 		if err := ioutil.WriteFile("/etc/resolv.conf", resolvConfSystem, 0644); err != nil {
 			c.Fatal(err)
 		}
 	}()
 
-	//1. test that a restarting container gets an updated resolv.conf
+	// 1. test that a restarting container gets an updated resolv.conf
 	dockerCmd(c, "run", "--name=first", "busybox", "true")
 	containerID1 := getIDByName(c, "first")
 
@@ -1472,16 +1472,16 @@ func (s *DockerSuite) TestRunResolvconfUpdate(c *testing.T) {
 		c.Fatalf("Restarted container does not have updated resolv.conf; expected %q, got %q", tmpResolvConf, string(containerResolv))
 	}
 
-	/*	//make a change to resolv.conf (in this case replacing our tmp copy with orig copy)
+	/*	// make a change to resolv.conf (in this case replacing our tmp copy with orig copy)
 		if err := ioutil.WriteFile("/etc/resolv.conf", resolvConfSystem, 0644); err != nil {
 						c.Fatal(err)
 								} */
-	//2. test that a restarting container does not receive resolv.conf updates
+	// 2. test that a restarting container does not receive resolv.conf updates
 	//   if it modified the container copy of the starting point resolv.conf
 	dockerCmd(c, "run", "--name=second", "busybox", "sh", "-c", "echo 'search mylittlepony.com' >>/etc/resolv.conf")
 	containerID2 := getIDByName(c, "second")
 
-	//make a change to resolv.conf (in this case replacing our tmp copy with orig copy)
+	// make a change to resolv.conf (in this case replacing our tmp copy with orig copy)
 	if err := ioutil.WriteFile("/etc/resolv.conf", resolvConfSystem, 0644); err != nil {
 		c.Fatal(err)
 	}
@@ -1495,7 +1495,7 @@ func (s *DockerSuite) TestRunResolvconfUpdate(c *testing.T) {
 		c.Fatalf("Container's resolv.conf should not have been updated with host resolv.conf: %q", string(containerResolv))
 	}
 
-	//3. test that a running container's resolv.conf is not modified while running
+	// 3. test that a running container's resolv.conf is not modified while running
 	out, _ := dockerCmd(c, "run", "-d", "busybox", "top")
 	runningContainerID := strings.TrimSpace(out)
 
@@ -1510,7 +1510,7 @@ func (s *DockerSuite) TestRunResolvconfUpdate(c *testing.T) {
 		c.Fatalf("Running container should not have updated resolv.conf; expected %q, got %q", string(resolvConfSystem), string(containerResolv))
 	}
 
-	//4. test that a running container's resolv.conf is updated upon restart
+	// 4. test that a running container's resolv.conf is updated upon restart
 	//   (the above container is still running..)
 	dockerCmd(c, "restart", runningContainerID)
 
@@ -1520,7 +1520,7 @@ func (s *DockerSuite) TestRunResolvconfUpdate(c *testing.T) {
 		c.Fatalf("Restarted container should have updated resolv.conf; expected %q, got %q", string(tmpResolvConf), string(containerResolv))
 	}
 
-	//5. test that additions of a localhost resolver are cleaned from
+	// 5. test that additions of a localhost resolver are cleaned from
 	//   host resolv.conf before updating container's resolv.conf copies
 
 	// replace resolv.conf with a localhost-only nameserver copy
@@ -1539,7 +1539,7 @@ func (s *DockerSuite) TestRunResolvconfUpdate(c *testing.T) {
 		c.Fatalf("Container does not have cleaned/replaced DNS in resolv.conf; expected %q, got %q", expected, string(containerResolv))
 	}
 
-	//6. Test that replacing (as opposed to modifying) resolv.conf triggers an update
+	// 6. Test that replacing (as opposed to modifying) resolv.conf triggers an update
 	//   of containers' resolv.conf.
 
 	// Restore the original resolv.conf
@@ -1570,7 +1570,7 @@ func (s *DockerSuite) TestRunResolvconfUpdate(c *testing.T) {
 		c.Fatalf("Stopped container does not have updated resolv.conf; expected\n%q\n got\n%q", tmpResolvConf, string(containerResolv))
 	}
 
-	//cleanup, restore original resolv.conf happens in defer func()
+	// cleanup, restore original resolv.conf happens in defer func()
 }
 
 func (s *DockerSuite) TestRunAddHost(c *testing.T) {
@@ -1765,7 +1765,7 @@ func (s *DockerSuite) TestRunExitOnStdinClose(c *testing.T) {
 	if err := stdin.Close(); err != nil {
 		c.Fatal(err)
 	}
-	finish := make(chan error)
+	finish := make(chan error, 1)
 	go func() {
 		finish <- runCmd.Wait()
 		close(finish)
@@ -1958,7 +1958,7 @@ func (s *DockerSuite) TestRunCidFileCleanupIfEmpty(c *testing.T) {
 }
 
 // #2098 - Docker cidFiles only contain short version of the containerId
-//sudo docker run --cidfile /tmp/docker_tesc.cid ubuntu echo "test"
+// sudo docker run --cidfile /tmp/docker_tesc.cid ubuntu echo "test"
 // TestRunCidFile tests that run --cidfile returns the longid
 func (s *DockerSuite) TestRunCidFileCheckIDLength(c *testing.T) {
 	tmpDir, err := ioutil.TempDir("", "TestRunCidFile")
@@ -2016,7 +2016,7 @@ func (s *DockerSuite) TestRunInspectMacAddress(c *testing.T) {
 // test docker run use an invalid mac address
 func (s *DockerSuite) TestRunWithInvalidMacAddress(c *testing.T) {
 	out, _, err := dockerCmdWithError("run", "--mac-address", "92:d0:c6:0a:29", "busybox")
-	//use an invalid mac address should with an error out
+	// use an invalid mac address should with an error out
 	if err == nil || !strings.Contains(out, "is not a valid mac address") {
 		c.Fatalf("run with an invalid --mac-address should with error out")
 	}
@@ -2148,7 +2148,7 @@ func (s *DockerSuite) TestRunReuseBindVolumeThatIsSymlink(c *testing.T) {
 	dockerCmd(c, "run", "-v", fmt.Sprintf("%s:"+prefix+"/tmp/test", linkPath), "busybox", "ls", prefix+"/tmp/test")
 }
 
-//GH#10604: Test an "/etc" volume doesn't overlay special bind mounts in container
+// GH#10604: Test an "/etc" volume doesn't overlay special bind mounts in container
 func (s *DockerSuite) TestRunCreateVolumeEtc(c *testing.T) {
 	// While Windows supports volumes, it does not support --add-host hence
 	// this test is not applicable on Windows.
@@ -2523,7 +2523,7 @@ func (s *DockerSuite) TestRunPortFromDockerRangeInUse(c *testing.T) {
 }
 
 func (s *DockerSuite) TestRunTTYWithPipe(c *testing.T) {
-	errChan := make(chan error)
+	errChan := make(chan error, 1)
 	go func() {
 		defer close(errChan)
 
@@ -2810,7 +2810,7 @@ func (s *DockerSuite) TestRunPIDHostWithChildIsKillable(c *testing.T) {
 
 	assert.Assert(c, waitRun(name) == nil)
 
-	errchan := make(chan error)
+	errchan := make(chan error, 1)
 	go func() {
 		if out, _, err := dockerCmdWithError("kill", name); err != nil {
 			errchan <- fmt.Errorf("%v:\n%s", err, out)
@@ -2930,7 +2930,7 @@ func (s *DockerSuite) TestRunUnshareProc(c *testing.T) {
 
 	go func() {
 		name := "acidburn"
-		out, _, err := dockerCmdWithError("run", "--name", name, "--security-opt", "seccomp=unconfined", "debian:jessie", "unshare", "-p", "-m", "-f", "-r", "--mount-proc=/proc", "mount")
+		out, _, err := dockerCmdWithError("run", "--name", name, "--security-opt", "seccomp=unconfined", "debian:buster", "unshare", "-p", "-m", "-f", "-r", "--mount-proc=/proc", "mount")
 		if err == nil ||
 			!(strings.Contains(strings.ToLower(out), "permission denied") ||
 				strings.Contains(strings.ToLower(out), "operation not permitted")) {
@@ -2942,7 +2942,7 @@ func (s *DockerSuite) TestRunUnshareProc(c *testing.T) {
 
 	go func() {
 		name := "cereal"
-		out, _, err := dockerCmdWithError("run", "--name", name, "--security-opt", "seccomp=unconfined", "debian:jessie", "unshare", "-p", "-m", "-f", "-r", "mount", "-t", "proc", "none", "/proc")
+		out, _, err := dockerCmdWithError("run", "--name", name, "--security-opt", "seccomp=unconfined", "debian:buster", "unshare", "-p", "-m", "-f", "-r", "mount", "-t", "proc", "none", "/proc")
 		if err == nil ||
 			!(strings.Contains(strings.ToLower(out), "mount: cannot mount none") ||
 				strings.Contains(strings.ToLower(out), "permission denied") ||
@@ -2956,7 +2956,7 @@ func (s *DockerSuite) TestRunUnshareProc(c *testing.T) {
 	/* Ensure still fails if running privileged with the default policy */
 	go func() {
 		name := "crashoverride"
-		out, _, err := dockerCmdWithError("run", "--privileged", "--security-opt", "seccomp=unconfined", "--security-opt", "apparmor=docker-default", "--name", name, "debian:jessie", "unshare", "-p", "-m", "-f", "-r", "mount", "-t", "proc", "none", "/proc")
+		out, _, err := dockerCmdWithError("run", "--privileged", "--security-opt", "seccomp=unconfined", "--security-opt", "apparmor=docker-default", "--name", name, "debian:buster", "unshare", "-p", "-m", "-f", "-r", "mount", "-t", "proc", "none", "/proc")
 		if err == nil ||
 			!(strings.Contains(strings.ToLower(out), "mount: cannot mount none") ||
 				strings.Contains(strings.ToLower(out), "permission denied") ||
@@ -3622,7 +3622,7 @@ func (s *DockerSuite) TestRunStdinBlockedAfterContainerExit(c *testing.T) {
 	cmd.Stderr = stdout
 	assert.Assert(c, cmd.Start() == nil)
 
-	waitChan := make(chan error)
+	waitChan := make(chan error, 1)
 	go func() {
 		waitChan <- cmd.Wait()
 	}()
@@ -3790,7 +3790,7 @@ func (s *DockerSuite) TestRunVolumesMountedAsShared(c *testing.T) {
 	dockerCmd(c, "run", "--privileged", "-v", fmt.Sprintf("%s:/volume-dest:shared", tmpDir), "busybox", "mount", "--bind", "/volume-dest/mnt1", "/volume-dest/mnt1")
 
 	// Make sure a bind mount under a shared volume propagated to host.
-	if mounted, _ := mount.Mounted(path.Join(tmpDir, "mnt1")); !mounted {
+	if mounted, _ := mountinfo.Mounted(path.Join(tmpDir, "mnt1")); !mounted {
 		c.Fatalf("Bind mount under shared volume did not propagate to host")
 	}
 
@@ -3916,20 +3916,6 @@ func (s *DockerSuite) TestRunNamedVolumesFromNotRemoved(c *testing.T) {
 }
 
 func (s *DockerSuite) TestRunAttachFailedNoLeak(c *testing.T) {
-	if runtime.GOOS == "windows" {
-		// TODO @msabansal - https://github.com/moby/moby/issues/35023. Duplicate
-		// port mappings are not errored out on RS3 builds. Temporarily disabling
-		// this test pending further investigation. Note we parse kernel.GetKernelVersion
-		// rather than osversion.Build() as test binaries aren't manifested, so would
-		// otherwise report build 9200.
-		v, err := kernel.GetKernelVersion()
-		assert.NilError(c, err)
-		buildNumber, _ := strconv.Atoi(strings.Split(strings.SplitN(v.String(), " ", 3)[2][1:], ".")[0])
-		if buildNumber == osversion.RS3 {
-			c.Skip("Temporarily disabled on RS3 builds")
-		}
-	}
-
 	nroutines, err := getGoroutineNumber()
 	assert.NilError(c, err)
 

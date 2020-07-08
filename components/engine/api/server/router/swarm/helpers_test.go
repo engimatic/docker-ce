@@ -43,15 +43,27 @@ func TestAdjustForAPIVersion(t *testing.T) {
 			Placement: &swarm.Placement{
 				MaxReplicas: 222,
 			},
+			Resources: &swarm.ResourceRequirements{
+				Limits: &swarm.Limit{
+					Pids: 300,
+				},
+			},
 		},
 	}
 
 	// first, does calling this with a later version correctly NOT strip
 	// fields? do the later version first, so we can reuse this spec in the
 	// next test.
-	adjustForAPIVersion("1.40", spec)
+	adjustForAPIVersion("1.41", spec)
 	if !reflect.DeepEqual(spec.TaskTemplate.ContainerSpec.Sysctls, expectedSysctls) {
 		t.Error("Sysctls was stripped from spec")
+	}
+
+	if spec.TaskTemplate.Resources.Limits.Pids == 0 {
+		t.Error("PidsLimit was stripped from spec")
+	}
+	if spec.TaskTemplate.Resources.Limits.Pids != 300 {
+		t.Error("PidsLimit did not preserve the value from spec")
 	}
 
 	if spec.TaskTemplate.ContainerSpec.Privileges.CredentialSpec.Config != "someconfig" {
@@ -70,6 +82,10 @@ func TestAdjustForAPIVersion(t *testing.T) {
 	adjustForAPIVersion("1.29", spec)
 	if spec.TaskTemplate.ContainerSpec.Sysctls != nil {
 		t.Error("Sysctls was not stripped from spec")
+	}
+
+	if spec.TaskTemplate.Resources.Limits.Pids != 0 {
+		t.Error("PidsLimit was not stripped from spec")
 	}
 
 	if spec.TaskTemplate.ContainerSpec.Privileges.CredentialSpec.Config != "" {

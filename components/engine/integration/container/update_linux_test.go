@@ -11,14 +11,15 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/integration/internal/container"
 	"github.com/docker/docker/testutil/request"
-	"gotest.tools/assert"
-	is "gotest.tools/assert/cmp"
-	"gotest.tools/poll"
-	"gotest.tools/skip"
+	"gotest.tools/v3/assert"
+	is "gotest.tools/v3/assert/cmp"
+	"gotest.tools/v3/poll"
+	"gotest.tools/v3/skip"
 )
 
 func TestUpdateMemory(t *testing.T) {
 	skip.If(t, testEnv.DaemonInfo.OSType == "windows")
+	skip.If(t, testEnv.DaemonInfo.CgroupDriver == "none")
 	skip.If(t, !testEnv.DaemonInfo.MemoryLimit)
 	skip.If(t, !testEnv.DaemonInfo.SwapLimit)
 
@@ -68,6 +69,7 @@ func TestUpdateMemory(t *testing.T) {
 }
 
 func TestUpdateCPUQuota(t *testing.T) {
+	skip.If(t, testEnv.DaemonInfo.CgroupDriver == "none")
 	defer setupTest(t)()
 	client := testEnv.APIClient()
 	ctx := context.Background()
@@ -106,6 +108,7 @@ func TestUpdateCPUQuota(t *testing.T) {
 
 func TestUpdatePidsLimit(t *testing.T) {
 	skip.If(t, testEnv.DaemonInfo.OSType == "windows")
+	skip.If(t, testEnv.DaemonInfo.CgroupDriver == "none")
 	skip.If(t, !testEnv.DaemonInfo.PidsLimit)
 
 	defer setupTest(t)()

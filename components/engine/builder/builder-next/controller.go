@@ -86,7 +86,11 @@ func newController(rt http.RoundTripper, opt Opt) (*control.Controller, error) {
 		return nil, err
 	}
 
-	md, err := metadata.NewStore(filepath.Join(root, "metadata.db"))
+	if err := cache.MigrateV2(context.Background(), filepath.Join(root, "metadata.db"), filepath.Join(root, "metadata_v2.db"), store, snapshotter, lm); err != nil {
+		return nil, err
+	}
+
+	md, err := metadata.NewStore(filepath.Join(root, "metadata_v2.db"))
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +123,7 @@ func newController(rt http.RoundTripper, opt Opt) (*control.Controller, error) {
 		MetadataStore:   dist.V2MetadataService,
 		ImageStore:      dist.ImageStore,
 		ReferenceStore:  dist.ReferenceStore,
-		ResolverOpt:     opt.ResolverOpt,
+		RegistryHosts:   opt.RegistryHosts,
 		LayerStore:      dist.LayerStore,
 	})
 	if err != nil {
@@ -162,7 +166,7 @@ func newController(rt http.RoundTripper, opt Opt) (*control.Controller, error) {
 		return nil, errors.Errorf("snapshotter doesn't support differ")
 	}
 
-	p, err := parsePlatforms(binfmt_misc.SupportedPlatforms())
+	p, err := parsePlatforms(binfmt_misc.SupportedPlatforms(true))
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +214,7 @@ func newController(rt http.RoundTripper, opt Opt) (*control.Controller, error) {
 		Frontends:        frontends,
 		CacheKeyStorage:  cacheStorage,
 		ResolveCacheImporterFuncs: map[string]remotecache.ResolveCacheImporterFunc{
-			"registry": localinlinecache.ResolveCacheImporterFunc(opt.SessionManager, opt.ResolverOpt, store, dist.ReferenceStore, dist.ImageStore),
+			"registry": localinlinecache.ResolveCacheImporterFunc(opt.SessionManager, opt.RegistryHosts, store, dist.ReferenceStore, dist.ImageStore),
 			"local":    localremotecache.ResolveCacheImporterFunc(opt.SessionManager),
 		},
 		ResolveCacheExporterFuncs: map[string]remotecache.ResolveCacheExporterFunc{

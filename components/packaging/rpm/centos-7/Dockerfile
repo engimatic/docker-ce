@@ -17,10 +17,12 @@ ARG DISTRO
 ARG SUITE
 ENV DISTRO=${DISTRO}
 ENV SUITE=${SUITE}
+
+# In aarch64 (arm64) images, the altarch repo is specified as repository, but
+# failing, so replace the URL.
+RUN if [ -f /etc/yum.repos.d/CentOS-Sources.repo ]; then sed -i 's/altarch/centos/g' /etc/yum.repos.d/CentOS-Sources.repo; fi
 RUN yum install -y rpm-build rpmlint
 COPY SPECS /root/rpmbuild/SPECS
-# Overwrite repo that was failing on aarch64
-RUN sed -i 's/altarch/centos/g' /etc/yum.repos.d/CentOS-Sources.repo
 RUN yum-builddep -y /root/rpmbuild/SPECS/*.spec
 COPY --from=golang /usr/local/go /usr/local/go
 WORKDIR /root/rpmbuild

@@ -88,7 +88,8 @@
                 "cache_from": {"$ref": "#/definitions/list_of_strings"},
                 "network": {"type": "string"},
                 "target": {"type": "string"},
-                "shm_size": {"type": ["integer", "string"]}
+                "shm_size": {"type": ["integer", "string"]},
+                "extra_hosts": {"$ref": "#/definitions/list_or_dict"}
               },
               "additionalProperties": false
             }
@@ -96,6 +97,7 @@
         },
         "cap_add": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "cap_drop": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "cgroupns_mode": {"type": "string"},
         "cgroup_parent": {"type": "string"},
         "command": {
           "oneOf": [
@@ -390,7 +392,8 @@
               "type": "object",
               "properties": {
                 "cpus": {"type": "string"},
-                "memory": {"type": "string"}
+                "memory": {"type": "string"},
+                "pids": {"type": "integer"}
               },
               "additionalProperties": false
             },
