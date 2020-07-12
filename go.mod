@@ -4,12 +4,13 @@ go 1.12
 
 replace (
 	github.com/Sirupsen/logrus => github.com/sirupsen/logrus v1.4.2
-	github.com/docker/docker => github.com/docker/docker v1.4.2-0.20190918105654-07ff4f1de895
-	github.com/docker/docker v1.14.0-0.20190319215453-e7b5f7dbe98c => github.com/docker/docker v1.4.2-0.20190918105654-07ff4f1de895
+	//github.com/docker/docker => github.com/docker/docker v1.4.2-0.20190918105654-07ff4f1de895
+	//github.com/docker/docker v1.14.0-0.20190319215453-e7b5f7dbe98c => github.com/docker/docker v1.4.2-0.20190918105654-07ff4f1de895
 	k8s.io/api => k8s.io/api v0.0.0-20190620084959-7cf5895f2711
-	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.0.0-20190620085554-14e95df34f1f
+	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.18.5
 	k8s.io/apimachinery => k8s.io/apimachinery v0.0.0-20190612205821-1799e75a0719
-	k8s.io/apiserver => k8s.io/apiserver v0.0.0-20190620085212-47dc9a115b18
+	k8s.io/apiserver => k8s.io/apiserver v0.18.5
+	//k8s.io/apiserver => k8s.io/apiserver v0.0.0-20190620085212-47dc9a115b18
 	k8s.io/cli-runtime => k8s.io/cli-runtime v0.0.0-20190620085706-2090e6d8f84c
 	k8s.io/client-go => k8s.io/client-go v0.0.0-20190620085101-78d2af792bab
 	k8s.io/cloud-provider => k8s.io/cloud-provider v0.0.0-20190620090043-8301c0bda1f0
@@ -22,11 +23,12 @@ replace (
 	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.0.0-20190620085942-b7f18460b210
 	k8s.io/kube-proxy => k8s.io/kube-proxy v0.0.0-20190620085809-589f994ddf7f
 	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.0.0-20190620085912-4acac5405ec6
-	k8s.io/kubectl => ../../pkg/mod/k8s.io/kubectl
-	k8s.io/kubelet => ../../pkg/mod/k8s.io/kubelet
+	k8s.io/kubectl => k8s.io/kubectl v0.18.5
+	k8s.io/kubelet => k8s.io/kubelet v0.18.5
 	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.0.0-20190620090156-2138f2c9de18
 	k8s.io/metrics => k8s.io/metrics v0.0.0-20190620085625-3b22d835f165
-	k8s.io/sample-apiserver => ../../pkg/mod/k8s.io/sample-apiserver
+	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.18.5
+//modernc.org/cc => modernc.org/cc v1.0.0
 )
 
 require (
@@ -127,23 +129,24 @@ require (
 	github.com/vbatts/tar-split v0.11.1
 	github.com/vishvananda/netlink v1.0.0
 	github.com/xeipuuv/gojsonschema v1.2.0
-	go.etcd.io/bbolt v1.3.3
-	golang.org/x/crypto v0.0.0-20191206172530-e9b2fee46413
+	//go.etcd.io/bbolt v1.3.3
+	github.com/coreos/bbolt v1.3.3
+	golang.org/x/crypto v0.0.0-20200220183623-bac4c82f6975
 	golang.org/x/net v0.0.0-20191209160850-c0dbc17a3553
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	golang.org/x/sys v0.0.0-20191210023423-ac6580df4449
 	golang.org/x/text v0.3.2
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 	google.golang.org/genproto v0.0.0-20191206224255-0243a4be9c8f
-	google.golang.org/grpc v1.25.1
+	google.golang.org/grpc v1.26.0
 	gopkg.in/dancannon/gorethink.v3 v3.0.5 // indirect
 	gopkg.in/fatih/pool.v2 v2.0.0 // indirect
 	gopkg.in/gorethink/gorethink.v3 v3.0.5 // indirect
-	gopkg.in/yaml.v2 v2.2.7
+	gopkg.in/yaml.v2 v2.2.8
 	gotest.tools v2.2.0+incompatible
-	k8s.io/api v0.0.0
-	k8s.io/apimachinery v0.0.0
-	k8s.io/client-go v0.0.0
+	k8s.io/api v0.18.5
+	k8s.io/apimachinery v0.18.5
+	k8s.io/client-go v0.18.5
 	k8s.io/kubernetes v1.17.0
 	vbom.ml/util v0.0.0-20180919145318-efcd4e0f9787
 )
